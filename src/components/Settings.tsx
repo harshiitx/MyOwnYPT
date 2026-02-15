@@ -307,9 +307,14 @@ export default function Settings() {
         <div className="bg-surface-light/30 rounded-2xl p-4 border border-white/5 text-center">
           <p className="text-lg mb-1">📖</p>
           <p className="text-sm font-medium text-text-primary">Study Timer</p>
-          <p className="text-xs text-text-secondary">
+          <p className="text-xs text-text-secondary mt-1">
             Your data is stored locally in your browser. Export regularly for backup.
           </p>
+          <div className="mt-3 pt-3 border-t border-white/5">
+            <p className="text-xs text-text-secondary">
+              Made by <span className="font-semibold text-primary">Daaku Harshit Bhardwaj</span>
+            </p>
+          </div>
         </div>
       </motion.section>
     </motion.div>
