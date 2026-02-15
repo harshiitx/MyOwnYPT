@@ -1,0 +1,395 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================
+   Default Theme Variables (Midnight)
+   ========================================== */
+:root {
+  --color-primary: 99 102 241;
+  --color-primary-dark: 79 70 229;
+  --color-accent: 168 85 247;
+  --color-surface: 15 23 42;
+  --color-surface-light: 30 41 59;
+  --color-surface-dark: 2 6 23;
+  --color-text-primary: 248 250 252;
+  --color-text-secondary: 148 163 184;
+}
+
+/* ==========================================
+   Base Styles
+   ========================================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: rgb(var(--color-surface));
+  color: rgb(var(--color-text-primary));
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* ==========================================
+   Scrollbar Styling
+   ========================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-surface-light));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-text-secondary) / 0.3);
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ==========================================
+   Selection
+   ========================================== */
+::selection {
+  background-color: rgb(var(--color-primary) / 0.3);
+  color: rgb(var(--color-text-primary));
+}
+
+/* ==========================================
+   Custom Utilities
+   ========================================== */
+@layer utilities {
+  .h-safe-bottom {
+    height: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ==========================================
+   Animations
+   ========================================== */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* ==========================================
+   Range Input Styling
+   ========================================== */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgb(var(--color-surface));
+  border-radius: 9999px;
+  height: 8px;
+  outline: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgb(var(--color-primary));
+  cursor: pointer;
+  box-shadow: 0 0 10px rgb(var(--color-primary) / 0.4);
+  transition: transform 0.15s ease;
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgb(var(--color-primary));
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 10px rgb(var(--color-primary) / 0.4);
+}
+
+/* ==========================================
+   Glass Effect
+   ========================================== */
+.glass {
+  background: rgb(var(--color-surface-light) / 0.4);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgb(255 255 255 / 0.05);
+}
+
+/* ==========================================
+   WALLPAPERS — Animated Background Effects
+   ========================================== */
+
+/* --- Aurora Borealis --- */
+.wp-aurora {
+  overflow: hidden;
+}
+.wp-aurora::before,
+.wp-aurora::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.6;
+}
+.wp-aurora::before {
+  width: 60vw;
+  height: 60vw;
+  max-width: 600px;
+  max-height: 600px;
+  background: radial-gradient(
+    circle,
+    rgb(var(--color-primary) / 0.4) 0%,
+    rgb(var(--color-accent) / 0.15) 50%,
+    transparent 70%
+  );
+  top: -15%;
+  left: -10%;
+  animation: aurora-drift-1 12s ease-in-out infinite alternate;
+}
+.wp-aurora::after {
+  width: 50vw;
+  height: 50vw;
+  max-width: 500px;
+  max-height: 500px;
+  background: radial-gradient(
+    circle,
+    rgb(var(--color-accent) / 0.35) 0%,
+    rgb(var(--color-primary-dark) / 0.12) 50%,
+    transparent 70%
+  );
+  bottom: -10%;
+  right: -10%;
+  animation: aurora-drift-2 14s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift-1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(8vw, 12vh) scale(1.1); }
+  66%  { transform: translate(-5vw, 8vh) scale(0.95); }
+  100% { transform: translate(12vw, -5vh) scale(1.05); }
+}
+@keyframes aurora-drift-2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(-10vw, -8vh) scale(1.08); }
+  66%  { transform: translate(6vw, -12vh) scale(0.92); }
+  100% { transform: translate(-8vw, 6vh) scale(1.02); }
+}
+
+/* --- Nebula / Deep Space --- */
+.wp-nebula {
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgb(var(--color-primary) / 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgb(var(--color-accent) / 0.08) 0%, transparent 40%),
+    radial-gradient(ellipse at 60% 80%, rgb(var(--color-primary-dark) / 0.1) 0%, transparent 45%);
+}
+.wp-nebula::before,
+.wp-nebula::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+}
+.wp-nebula::before {
+  width: 40vw;
+  height: 40vw;
+  max-width: 400px;
+  max-height: 400px;
+  background: radial-gradient(
+    circle,
+    rgb(var(--color-primary) / 0.5) 0%,
+    rgb(var(--color-primary) / 0.1) 40%,
+    transparent 65%
+  );
+  top: 10%;
+  left: 20%;
+  animation: nebula-pulse-1 8s ease-in-out infinite alternate;
+}
+.wp-nebula::after {
+  width: 35vw;
+  height: 35vw;
+  max-width: 350px;
+  max-height: 350px;
+  background: radial-gradient(
+    circle,
+    rgb(var(--color-accent) / 0.45) 0%,
+    rgb(var(--color-accent) / 0.08) 40%,
+    transparent 65%
+  );
+  bottom: 15%;
+  right: 15%;
+  animation: nebula-pulse-2 10s ease-in-out infinite alternate;
+}
+
+@keyframes nebula-pulse-1 {
+  0%   { transform: scale(1) translate(0, 0); opacity: 0.5; }
+  50%  { transform: scale(1.15) translate(3vw, 2vh); opacity: 0.7; }
+  100% { transform: scale(0.9) translate(-2vw, -3vh); opacity: 0.55; }
+}
+@keyframes nebula-pulse-2 {
+  0%   { transform: scale(1) translate(0, 0); opacity: 0.45; }
+  50%  { transform: scale(1.2) translate(-4vw, -2vh); opacity: 0.65; }
+  100% { transform: scale(0.95) translate(2vw, 4vh); opacity: 0.5; }
+}
+
+/* --- Cyber Grid --- */
+.wp-grid {
+  background-image:
+    linear-gradient(rgb(var(--color-primary) / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--color-primary) / 0.06) 1px, transparent 1px);
+  background-size: 50px 50px;
+  overflow: hidden;
+}
+.wp-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(var(--color-primary) / 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 100%, rgb(var(--color-accent) / 0.1) 0%, transparent 40%);
+}
+.wp-grid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgb(var(--color-primary) / 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--color-primary) / 0.12) 1px, transparent 1px);
+  background-size: 50px 50px;
+  mask-image: radial-gradient(ellipse at 50% 50%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 20%, transparent 70%);
+  animation: grid-glow 4s ease-in-out infinite alternate;
+}
+
+@keyframes grid-glow {
+  0%   { opacity: 0.3; }
+  100% { opacity: 0.8; }
+}
+
+/* --- Gradient Flow --- */
+.wp-gradient-flow {
+  background: linear-gradient(
+    -45deg,
+    rgb(var(--color-surface-dark)),
+    rgb(var(--color-primary) / 0.2),
+    rgb(var(--color-surface)),
+    rgb(var(--color-accent) / 0.15),
+    rgb(var(--color-surface-dark)),
+    rgb(var(--color-primary-dark) / 0.2)
+  );
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+}
+.wp-gradient-flow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgb(var(--color-primary) / 0.08) 25%,
+    transparent 50%,
+    rgb(var(--color-accent) / 0.06) 75%,
+    transparent 100%
+  );
+  background-size: 300% 300%;
+  animation: gradient-shift 20s ease infinite reverse;
+}
+
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  25%  { background-position: 100% 25%; }
+  50%  { background-position: 100% 50%; }
+  75%  { background-position: 0% 75%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* --- Bokeh Lights --- */
+.wp-bokeh {
+  overflow: hidden;
+}
+.wp-bokeh::before,
+.wp-bokeh::after {
+  content: '';
+  position: absolute;
+}
+/* Layer 1: Large blurred orbs */
+.wp-bokeh::before {
+  inset: 0;
+  background:
+    radial-gradient(circle 120px at 15% 25%, rgb(var(--color-primary) / 0.25) 0%, transparent 100%),
+    radial-gradient(circle 80px  at 75% 15%, rgb(var(--color-accent) / 0.2) 0%, transparent 100%),
+    radial-gradient(circle 100px at 55% 65%, rgb(var(--color-primary-dark) / 0.2) 0%, transparent 100%),
+    radial-gradient(circle 60px  at 85% 75%, rgb(var(--color-primary) / 0.18) 0%, transparent 100%),
+    radial-gradient(circle 90px  at 30% 80%, rgb(var(--color-accent) / 0.22) 0%, transparent 100%),
+    radial-gradient(circle 70px  at 10% 60%, rgb(var(--color-primary) / 0.15) 0%, transparent 100%);
+  filter: blur(2px);
+  animation: bokeh-float-1 18s ease-in-out infinite alternate;
+}
+/* Layer 2: Smaller floating lights */
+.wp-bokeh::after {
+  inset: 0;
+  background:
+    radial-gradient(circle 50px at 40% 20%, rgb(var(--color-accent) / 0.3) 0%, transparent 100%),
+    radial-gradient(circle 40px at 65% 45%, rgb(var(--color-primary) / 0.25) 0%, transparent 100%),
+    radial-gradient(circle 55px at 20% 55%, rgb(var(--color-primary-dark) / 0.2) 0%, transparent 100%),
+    radial-gradient(circle 35px at 80% 85%, rgb(var(--color-accent) / 0.28) 0%, transparent 100%),
+    radial-gradient(circle 45px at 50% 90%, rgb(var(--color-primary) / 0.2) 0%, transparent 100%);
+  filter: blur(1px);
+  animation: bokeh-float-2 22s ease-in-out infinite alternate;
+}
+
+@keyframes bokeh-float-1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(3vw, -2vh) scale(1.02); }
+  50%  { transform: translate(-2vw, 4vh) scale(0.98); }
+  75%  { transform: translate(4vw, 2vh) scale(1.03); }
+  100% { transform: translate(-3vw, -3vh) scale(1); }
+}
+@keyframes bokeh-float-2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(-4vw, 3vh) scale(0.97); }
+  50%  { transform: translate(3vw, -4vh) scale(1.04); }
+  75%  { transform: translate(-2vw, -2vh) scale(0.99); }
+  100% { transform: translate(5vw, 2vh) scale(1.01); }
+}
