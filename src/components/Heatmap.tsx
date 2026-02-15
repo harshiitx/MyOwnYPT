@@ -2,17 +2,25 @@
 
 // ==========================================
 // Study Heatmap — GitHub-style Contribution Grid
+// Responsive, mobile-friendly, timezone-safe
 // ==========================================
 
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { StudySession } from '@/lib/types';
-import { getStudyDate, getDailySummary, formatDuration } from '@/lib/utils';
-import { format, subDays, parseISO, startOfWeek, differenceInCalendarWeeks } from 'date-fns';
+import { getStudyDate, formatDuration } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Grid3X3 } from 'lucide-react';
 
 interface HeatmapProps {
   sessions: StudySession[];
+}
+
+interface DayCell {
+  date: string;       // YYYY-MM-DD
+  totalSeconds: number;
+  intensity: number;
+  isToday: boolean;
+  tooltipLabel: string;
 }
 
 function getIntensity(totalSeconds: number): number {
@@ -25,23 +33,41 @@ function getIntensity(totalSeconds: number): number {
 }
 
 const INTENSITY_CLASSES = [
-  'bg-surface-light/30',                           // 0: no activity
-  'bg-primary/20',                                  // 1: light
-  'bg-primary/40',                                  // 2: moderate
-  'bg-primary/60',                                  // 3: good
-  'bg-primary/80',                                  // 4: great
-  'bg-primary',                                     // 5: intense
+  'bg-surface-light/30',   // 0: no activity
+  'bg-primary/20',          // 1: light
+  'bg-primary/40',          // 2: moderate
+  'bg-primary/60',          // 3: good
+  'bg-primary/80',          // 4: great
+  'bg-primary',             // 5: intense
 ];
 
 const DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const TOTAL_WEEKS = 16;
+
+// Pure date helpers (no date-fns — avoids timezone parsing issues)
+function toDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function toTooltip(d: Date): string {
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
 
 export default function Heatmap({ sessions }: HeatmapProps) {
-  const { weeks, monthLabels } = useMemo(() => {
-    const today = getStudyDate();
-    const todayDate = parseISO(today);
-    const TOTAL_WEEKS = 13; // ~3 months
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Build daily totals map
+  const { weeks, monthLabels } = useMemo(() => {
+    const todayStr = getStudyDate();
+    const [ty, tm, td] = todayStr.split('-').map(Number);
+    // Use noon to avoid any DST / timezone boundary issues
+    const todayDate = new Date(ty, tm - 1, td, 12, 0, 0);
+    const todayDOW = todayDate.getDay(); // 0=Sun ... 6=Sat
+
+    // Build daily totals map from completed sessions
     const dailyTotals = new Map<string, number>();
     for (const session of sessions) {
       if (session.endTime === null) continue;
@@ -49,24 +75,31 @@ export default function Heatmap({ sessions }: HeatmapProps) {
       dailyTotals.set(session.date, current + session.duration);
     }
 
-    // Generate grid data — 13 weeks × 7 days
-    const weeks: { date: string; totalSeconds: number; intensity: number }[][] = [];
-    const startDate = subDays(todayDate, TOTAL_WEEKS * 7 - 1);
+    // Grid: (TOTAL_WEEKS - 1) complete weeks + partial last week ending on today
+    // This ensures the first cell is a Sunday and the last cell is today
+    const totalCells = (TOTAL_WEEKS - 1) * 7 + todayDOW + 1;
 
-    // Align to start of week (Sunday)
-    const weekStart = startOfWeek(startDate, { weekStartsOn: 0 });
-    const totalDays = differenceInCalendarWeeks(todayDate, weekStart, { weekStartsOn: 0 }) * 7 + todayDate.getDay() + 1;
+    const cells: DayCell[] = [];
+    for (let i = totalCells - 1; i >= 0; i--) {
+      const d = new Date(todayDate.getTime());
+      d.setDate(d.getDate() - i);
+      const dateStr = toDateStr(d);
+      const totalSeconds = dailyTotals.get(dateStr) || 0;
 
-    let currentWeek: { date: string; totalSeconds: number; intensity: number }[] = [];
-
-    for (let i = 0; i < Math.max(totalDays, TOTAL_WEEKS * 7); i++) {
-      const date = format(subDays(todayDate, Math.max(totalDays, TOTAL_WEEKS * 7) - 1 - i), 'yyyy-MM-dd');
-      const totalSeconds = dailyTotals.get(date) || 0;
-      currentWeek.push({
-        date,
+      cells.push({
+        date: dateStr,
         totalSeconds,
         intensity: getIntensity(totalSeconds),
+        isToday: dateStr === todayStr,
+        tooltipLabel: `${toTooltip(d)}: ${totalSeconds > 0 ? formatDuration(totalSeconds) : 'No study'}`,
       });
+    }
+
+    // Group into weeks (columns of 7 days each)
+    const weeks: DayCell[][] = [];
+    let currentWeek: DayCell[] = [];
+    for (const cell of cells) {
+      currentWeek.push(cell);
       if (currentWeek.length === 7) {
         weeks.push(currentWeek);
         currentWeek = [];
@@ -76,89 +109,108 @@ export default function Heatmap({ sessions }: HeatmapProps) {
       weeks.push(currentWeek);
     }
 
-    // Generate month labels
-    const monthLabels: { label: string; weekIndex: number }[] = [];
-    let lastMonth = '';
+    // Month labels: detect month transitions from each week's first day
+    const monthLabels: { weekIndex: number; label: string }[] = [];
+    let prevMonth = -1;
     for (let w = 0; w < weeks.length; w++) {
-      // Use the first day of each week to determine the month
       const firstDay = weeks[w][0];
-      if (firstDay) {
-        const month = format(parseISO(firstDay.date), 'MMM');
-        if (month !== lastMonth) {
-          monthLabels.push({ label: month, weekIndex: w });
-          lastMonth = month;
-        }
+      const month = +firstDay.date.split('-')[1] - 1; // 0-indexed
+      if (month !== prevMonth) {
+        monthLabels.push({ weekIndex: w, label: MONTH_NAMES[month] });
+        prevMonth = month;
       }
     }
 
     return { weeks, monthLabels };
   }, [sessions]);
 
+  // Auto-scroll to show the most recent data (right side)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollLeft = el.scrollWidth;
+    }
+  }, [weeks]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-surface-light/50 backdrop-blur-sm rounded-2xl p-5 border border-white/5"
+      className="bg-surface-light/50 backdrop-blur-sm rounded-2xl p-4 sm:p-5 border border-white/5"
     >
-      <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2 mb-4">
+      <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2 mb-3 sm:mb-4">
         <Grid3X3 size={18} />
         Study Heatmap
       </h2>
 
-      {/* Month labels */}
-      <div className="flex ml-8 mb-1">
-        {monthLabels.map((m, i) => (
-          <span
-            key={`${m.label}-${i}`}
-            className="text-[10px] text-text-secondary"
-            style={{
-              position: 'relative',
-              left: `${m.weekIndex * (14 + 3)}px`,
-              marginRight: i < monthLabels.length - 1
-                ? `${((monthLabels[i + 1]?.weekIndex || 0) - m.weekIndex) * (14 + 3) - 30}px`
-                : 0,
-            }}
-          >
-            {m.label}
-          </span>
-        ))}
+      {/* Scrollable grid container */}
+      <div ref={scrollRef} className="overflow-x-auto scrollbar-none">
+        <div className="inline-flex gap-[2px] sm:gap-[3px]">
+          {/* Day labels column (sticky on left) */}
+          <div className="flex flex-col gap-[2px] sm:gap-[3px] pr-1 sm:pr-1.5 shrink-0">
+            {/* Spacer for month label row */}
+            <div className="h-3 sm:h-4" />
+            {DAY_LABELS.map((label, i) => (
+              <div
+                key={i}
+                className="h-[10px] sm:h-[13px] flex items-center justify-end"
+              >
+                <span className="text-[7px] sm:text-[9px] text-text-secondary/60 leading-none">
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Week columns */}
+          {weeks.map((week, wi) => {
+            const monthLabel = monthLabels.find(m => m.weekIndex === wi);
+            return (
+              <div key={wi} className="flex flex-col gap-[2px] sm:gap-[3px]">
+                {/* Month label row — aligned with its column */}
+                <div className="h-3 sm:h-4 flex items-end overflow-visible">
+                  {monthLabel && (
+                    <span className="text-[7px] sm:text-[10px] text-text-secondary leading-none whitespace-nowrap">
+                      {monthLabel.label}
+                    </span>
+                  )}
+                </div>
+
+                {/* Day cells */}
+                {week.map((day) => (
+                  <div
+                    key={day.date}
+                    className={`
+                      w-[10px] h-[10px] sm:w-[13px] sm:h-[13px] rounded-[2px] sm:rounded-[3px]
+                      transition-colors duration-200 cursor-default
+                      ${INTENSITY_CLASSES[day.intensity]}
+                      ${day.isToday
+                        ? 'ring-1.5 ring-primary ring-offset-1 ring-offset-surface'
+                        : 'hover:ring-1 hover:ring-primary/40'
+                      }
+                    `}
+                    title={day.tooltipLabel}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Grid */}
-      <div className="flex gap-0.5">
-        {/* Day labels */}
-        <div className="flex flex-col gap-0.5 mr-1.5">
-          {DAY_LABELS.map((label, i) => (
-            <div key={i} className="h-[14px] flex items-center justify-end">
-              <span className="text-[9px] text-text-secondary/60 leading-none">{label}</span>
-            </div>
-          ))}
+      {/* Legend + Today indicator */}
+      <div className="flex items-center justify-between mt-2 sm:mt-3">
+        <div className="flex items-center gap-1">
+          <div className="w-[8px] h-[8px] sm:w-[10px] sm:h-[10px] rounded-[2px] bg-surface-light/30 ring-1 ring-primary ring-offset-1 ring-offset-surface" />
+          <span className="text-[8px] sm:text-[10px] text-text-secondary">Today</span>
         </div>
-
-        {/* Weeks */}
-        <div className="flex gap-0.5 overflow-x-auto scrollbar-none">
-          {weeks.map((week, wi) => (
-            <div key={wi} className="flex flex-col gap-0.5">
-              {week.map((day, di) => (
-                <div
-                  key={day.date}
-                  className={`w-[14px] h-[14px] rounded-[3px] ${INTENSITY_CLASSES[day.intensity]} 
-                    transition-colors duration-200 hover:ring-1 hover:ring-primary/50 cursor-default`}
-                  title={`${format(parseISO(day.date), 'MMM d, yyyy')}: ${day.totalSeconds > 0 ? formatDuration(day.totalSeconds) : 'No study'}`}
-                />
-              ))}
-            </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[8px] sm:text-[10px] text-text-secondary mr-0.5">Less</span>
+          {INTENSITY_CLASSES.map((cls, i) => (
+            <div key={i} className={`w-[8px] h-[8px] sm:w-[10px] sm:h-[10px] rounded-[2px] ${cls}`} />
           ))}
+          <span className="text-[8px] sm:text-[10px] text-text-secondary ml-0.5">More</span>
         </div>
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center justify-end gap-1 mt-3">
-        <span className="text-[10px] text-text-secondary mr-1">Less</span>
-        {INTENSITY_CLASSES.map((cls, i) => (
-          <div key={i} className={`w-[12px] h-[12px] rounded-[2px] ${cls}`} />
-        ))}
-        <span className="text-[10px] text-text-secondary ml-1">More</span>
       </div>
     </motion.div>
   );
