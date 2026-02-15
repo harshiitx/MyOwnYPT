@@ -6,6 +6,7 @@
 
 import { create } from 'zustand';
 import { StudySession, UnlockedAchievement, AppSettings } from '@/lib/types';
+import { UserSubject } from '@/lib/subjects';
 import {
   loadSessions,
   saveSessions,
@@ -13,6 +14,8 @@ import {
   saveAchievements,
   loadSettings,
   saveSettings,
+  loadSubjects,
+  saveSubjects,
   saveTimerState,
   clearTimerState,
   loadTimerState,
@@ -25,11 +28,13 @@ interface StoreState {
   isRunning: boolean;
   currentSessionStart: number | null;
   elapsedBeforePause: number;
+  currentSubject: string | null;
 
   // Data
   sessions: StudySession[];
   unlockedAchievements: UnlockedAchievement[];
   settings: AppSettings;
+  subjects: UserSubject[];
 
   // UI
   activeTab: 'timer' | 'dashboard' | 'achievements' | 'settings';
@@ -44,6 +49,9 @@ interface StoreState {
   setActiveTab: (tab: StoreState['activeTab']) => void;
   dismissAchievement: (id: string) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
+  setCurrentSubject: (subject: string | null) => void;
+  addSubject: (subject: UserSubject) => void;
+  removeSubject: (id: string) => void;
   importData: (sessions: StudySession[], achievements: UnlockedAchievement[], settings: AppSettings) => void;
   clearAllData: () => void;
 }
@@ -53,6 +61,7 @@ export const useStore = create<StoreState>((set, get) => ({
   isRunning: false,
   currentSessionStart: null,
   elapsedBeforePause: 0,
+  currentSubject: null,
   sessions: [],
   unlockedAchievements: [],
   settings: {
@@ -61,6 +70,7 @@ export const useStore = create<StoreState>((set, get) => ({
     dailyGoalHours: 5,
     soundEnabled: true,
   },
+  subjects: [],
   activeTab: 'timer',
   newAchievements: [],
   hydrated: false,
@@ -70,20 +80,22 @@ export const useStore = create<StoreState>((set, get) => ({
     const sessions = loadSessions();
     const achievements = loadAchievements();
     const settings = loadSettings();
+    const subjects = loadSubjects();
     const timerState = loadTimerState();
 
     let isRunning = false;
     let currentSessionStart: number | null = null;
     let elapsedBeforePause = 0;
+    let currentSubject: string | null = null;
 
     // Recover timer state if it was running
     if (timerState) {
+      currentSubject = timerState.subject || null;
       if (timerState.isRunning && timerState.sessionStartTime) {
         isRunning = true;
         currentSessionStart = timerState.sessionStartTime;
         elapsedBeforePause = timerState.elapsedBeforePause;
       } else if (!timerState.isRunning && timerState.elapsedBeforePause > 0) {
-        // Was paused
         elapsedBeforePause = timerState.elapsedBeforePause;
       }
     }
@@ -92,9 +104,11 @@ export const useStore = create<StoreState>((set, get) => ({
       sessions,
       unlockedAchievements: achievements,
       settings,
+      subjects,
       isRunning,
       currentSessionStart,
       elapsedBeforePause,
+      currentSubject,
       hydrated: true,
     });
   },
@@ -109,6 +123,7 @@ export const useStore = create<StoreState>((set, get) => ({
       isRunning: true,
       sessionStartTime: now,
       elapsedBeforePause: state.elapsedBeforePause,
+      subject: state.currentSubject,
     });
   },
 
@@ -129,19 +144,18 @@ export const useStore = create<StoreState>((set, get) => ({
       isRunning: false,
       sessionStartTime: null,
       elapsedBeforePause: totalElapsed,
+      subject: state.currentSubject,
     });
   },
 
   stopTimer: () => {
     const state = get();
 
-    // Calculate total session duration
     let totalDuration = state.elapsedBeforePause;
     if (state.isRunning && state.currentSessionStart) {
       totalDuration += (Date.now() - state.currentSessionStart) / 1000;
     }
 
-    // Only save sessions longer than 10 seconds
     if (totalDuration >= 10) {
       const sessionStartTime = Date.now() - totalDuration * 1000;
       const newSession: StudySession = {
@@ -150,12 +164,12 @@ export const useStore = create<StoreState>((set, get) => ({
         endTime: Date.now(),
         duration: Math.floor(totalDuration),
         date: getStudyDate(sessionStartTime),
+        ...(state.currentSubject ? { subject: state.currentSubject } : {}),
       };
 
       const updatedSessions = [...state.sessions, newSession];
       saveSessions(updatedSessions);
 
-      // Check for new achievements
       const newAchievementIds = checkAchievements(
         updatedSessions,
         state.unlockedAchievements,
@@ -176,16 +190,17 @@ export const useStore = create<StoreState>((set, get) => ({
         isRunning: false,
         currentSessionStart: null,
         elapsedBeforePause: 0,
+        currentSubject: null,
         sessions: updatedSessions,
         unlockedAchievements: updatedAchievements,
         newAchievements: [...state.newAchievements, ...newAchievementIds],
       });
     } else {
-      // Session too short, discard
       set({
         isRunning: false,
         currentSessionStart: null,
         elapsedBeforePause: 0,
+        currentSubject: null,
       });
     }
 
@@ -208,6 +223,37 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
+  setCurrentSubject: (subject) => {
+    set({ currentSubject: subject });
+    const state = get();
+    if (state.isRunning || state.elapsedBeforePause > 0) {
+      saveTimerState({
+        isRunning: state.isRunning,
+        sessionStartTime: state.currentSessionStart,
+        elapsedBeforePause: state.elapsedBeforePause,
+        subject,
+      });
+    }
+  },
+
+  addSubject: (subject) => {
+    set(state => {
+      const updated = [...state.subjects, subject];
+      saveSubjects(updated);
+      return { subjects: updated };
+    });
+  },
+
+  removeSubject: (id) => {
+    set(state => {
+      const updated = state.subjects.filter(s => s.id !== id);
+      saveSubjects(updated);
+      // If the removed subject was currently selected, deselect it
+      const newCurrentSubject = state.currentSubject === id ? null : state.currentSubject;
+      return { subjects: updated, currentSubject: newCurrentSubject };
+    });
+  },
+
   importData: (sessions, achievements, settings) => {
     saveSessions(sessions);
     saveAchievements(achievements);
@@ -225,6 +271,7 @@ export const useStore = create<StoreState>((set, get) => ({
       isRunning: false,
       currentSessionStart: null,
       elapsedBeforePause: 0,
+      currentSubject: null,
       newAchievements: [],
     });
   },

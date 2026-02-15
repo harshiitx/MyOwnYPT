@@ -8,6 +8,7 @@ export interface StudySession {
   endTime: number | null;  // null if session is ongoing
   duration: number;         // Duration in seconds
   date: string;            // YYYY-MM-DD (based on 5 AM cutoff)
+  subject?: string;        // Subject tag ID (optional)
 }
 
 export interface DailySummary {

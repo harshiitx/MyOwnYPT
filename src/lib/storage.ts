@@ -14,12 +14,14 @@
 // ==========================================
 
 import { StudySession, UnlockedAchievement, AppSettings } from './types';
+import { UserSubject, DEFAULT_SUBJECTS } from './subjects';
 
 const STORAGE_KEYS = {
   SESSIONS: 'ypt_sessions',
   ACHIEVEMENTS: 'ypt_achievements',
   SETTINGS: 'ypt_settings',
   TIMER_STATE: 'ypt_timer_state',
+  SUBJECTS: 'ypt_subjects',
 } as const;
 
 // ---- Sessions ----
@@ -92,12 +94,36 @@ export function saveSettings(settings: AppSettings): void {
   }
 }
 
+// ---- Custom Subjects ----
+
+export function loadSubjects(): UserSubject[] {
+  if (typeof window === 'undefined') return DEFAULT_SUBJECTS;
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.SUBJECTS);
+    if (!data) return DEFAULT_SUBJECTS; // First load → defaults
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SUBJECTS;
+  } catch {
+    return DEFAULT_SUBJECTS;
+  }
+}
+
+export function saveSubjects(subjects: UserSubject[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(subjects));
+  } catch (e) {
+    console.error('Failed to save subjects:', e);
+  }
+}
+
 // ---- Timer State (for recovery after refresh) ----
 
 export interface PersistedTimerState {
   isRunning: boolean;
   sessionStartTime: number | null;
   elapsedBeforePause: number;
+  subject?: string | null;
 }
 
 export function loadTimerState(): PersistedTimerState | null {
@@ -131,8 +157,9 @@ export function exportAllData(): string {
     sessions: loadSessions(),
     achievements: loadAchievements(),
     settings: loadSettings(),
+    subjects: loadSubjects(),
     exportedAt: new Date().toISOString(),
-    version: 1,
+    version: 2, // bumped for subjects support
   };
   return JSON.stringify(data, null, 2);
 }
@@ -146,6 +173,7 @@ export function importAllData(jsonString: string): boolean {
     saveSessions(data.sessions);
     if (data.achievements) saveAchievements(data.achievements);
     if (data.settings) saveSettings(data.settings);
+    if (data.subjects) saveSubjects(data.subjects);
     return true;
   } catch (e) {
     console.error('Failed to import data:', e);

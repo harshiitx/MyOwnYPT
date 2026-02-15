@@ -5,6 +5,12 @@ import { useStore } from '@/store/useStore';
 import { THEMES, WALLPAPERS } from '@/lib/themes';
 import { exportAllData, importAllData, clearAllData } from '@/lib/storage';
 import { ThemeId, WallpaperId } from '@/lib/types';
+import {
+  getSubjectBgClass,
+  validateSubjectName,
+  createSubject,
+  MAX_SUBJECTS,
+} from '@/lib/subjects';
 import { motion } from 'framer-motion';
 import {
   Palette,
@@ -17,13 +23,24 @@ import {
   VolumeX,
   Check,
   AlertTriangle,
+  Tags,
+  Plus,
+  X,
 } from 'lucide-react';
 
 export default function Settings() {
-  const { settings, updateSettings, clearAllData: clearStore } = useStore();
+  const {
+    settings, updateSettings, clearAllData: clearStore,
+    subjects, addSubject, removeSubject,
+  } = useStore();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Subject management
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [subjectError, setSubjectError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleExport = () => {
     const data = exportAllData();
@@ -46,7 +63,6 @@ export default function Settings() {
       const success = importAllData(content);
       setImportStatus(success ? 'success' : 'error');
       if (success) {
-        // Reload the page to pick up new data
         window.location.reload();
       }
       setTimeout(() => setImportStatus('idle'), 3000);
@@ -58,6 +74,26 @@ export default function Settings() {
     clearAllData();
     clearStore();
     setShowClearConfirm(false);
+  };
+
+  const handleAddSubject = () => {
+    const result = validateSubjectName(newSubjectName, subjects);
+    if (!result.valid) {
+      setSubjectError(result.error || 'Invalid name');
+      return;
+    }
+    const newSubject = createSubject(result.sanitized, subjects);
+    addSubject(newSubject);
+    setNewSubjectName('');
+    setSubjectError(null);
+  };
+
+  const handleSubjectKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleAddSubject();
+    if (e.key === 'Escape') {
+      setNewSubjectName('');
+      setSubjectError(null);
+    }
   };
 
   const containerVariants = {
@@ -83,6 +119,95 @@ export default function Settings() {
       <motion.h1 variants={itemVariants} className="text-2xl font-bold text-text-primary mb-6">
         Settings
       </motion.h1>
+
+      {/* Subject Management */}
+      <motion.section variants={itemVariants} className="mb-8">
+        <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2 mb-4">
+          <Tags size={18} />
+          Subject Tags
+        </h2>
+        <div className="bg-surface-light/50 backdrop-blur-sm rounded-2xl p-4 border border-white/5">
+          <p className="text-xs text-text-secondary mb-3">
+            Manage your study subjects. Tap a subject while studying to tag your session.
+          </p>
+
+          {/* Existing subjects */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {subjects.map(subject => (
+              <div
+                key={subject.id}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium
+                           ${getSubjectBgClass(subject.color, true)}`}
+              >
+                <span>{subject.emoji}</span>
+                <span>{subject.name}</span>
+                {confirmDeleteId === subject.id ? (
+                  <div className="flex items-center gap-0.5 ml-1">
+                    <button
+                      onClick={() => { removeSubject(subject.id); setConfirmDeleteId(null); }}
+                      className="p-0.5 rounded-full bg-red-500/30 text-red-300 hover:bg-red-500/50 transition-colors"
+                      title="Confirm delete"
+                    >
+                      <Check size={10} />
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="p-0.5 rounded-full bg-surface/50 text-text-secondary hover:text-text-primary transition-colors"
+                      title="Cancel"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteId(subject.id)}
+                    className="p-0.5 rounded-full hover:bg-white/10 text-current opacity-50 hover:opacity-100 transition-all ml-0.5"
+                    title="Remove subject"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add new subject */}
+          {subjects.length < MAX_SUBJECTS && (
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={newSubjectName}
+                    onChange={(e) => { setNewSubjectName(e.target.value); setSubjectError(null); }}
+                    onKeyDown={handleSubjectKeyDown}
+                    placeholder="New subject name..."
+                    maxLength={24}
+                    className="w-full px-3 py-2 rounded-xl border border-white/10 bg-surface/50
+                               text-sm text-text-primary placeholder:text-text-secondary/40
+                               focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/30"
+                  />
+                </div>
+                <button
+                  onClick={handleAddSubject}
+                  disabled={!newSubjectName.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/20 text-primary text-sm font-medium
+                             hover:bg-primary/30 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} />
+                  Add
+                </button>
+              </div>
+              {subjectError && (
+                <p className="text-xs text-red-400 mt-1.5 ml-1">{subjectError}</p>
+              )}
+              <p className="text-[10px] text-text-secondary/50 mt-1.5 ml-1">
+                {subjects.length}/{MAX_SUBJECTS} subjects • Letters, numbers, spaces, basic punctuation
+              </p>
+            </div>
+          )}
+        </div>
+      </motion.section>
 
       {/* Theme Selection */}
       <motion.section variants={itemVariants} className="mb-8">
@@ -142,7 +267,6 @@ export default function Settings() {
                   <Check size={12} className="text-primary" />
                 </div>
               )}
-              {/* Mini wallpaper preview */}
               <div className="relative w-full h-14 rounded-lg overflow-hidden bg-surface-dark">
                 {wp.className && (
                   <div className={`absolute inset-0 ${wp.className}`} style={{ animationDuration: '4s' }} />
